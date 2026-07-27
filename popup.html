@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FastExclude for Senler</title>
+  <!-- Google Fonts: Plus Jakarta Sans & DM Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+  <!-- Top Nav Bar -->
+  <header class="app-header">
+    <div class="nav-pill-container">
+      <div class="brand">
+        <span class="brand-logo-fire"></span>
+        <span class="brand-name">FASTEXCLUDE</span>
+      </div>
+      <div class="header-actions">
+        <button id="btnExportImport" class="btn-ghost-pill" title="Экспорт / Импорт пресетов">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mode Selector Tabs (⚡ Исключения | ✉️ Рассылка) -->
+  <nav class="mode-tabs-container">
+    <button id="tabExclusions" class="mode-tab active">
+      ⚡ ИСКЛЮЧЕНИЯ
+    </button>
+    <button id="tabMailings" class="mode-tab">
+      ✉️ СОЗДАНИЕ РАССЫЛКИ
+    </button>
+  </nav>
+
+  <!-- VIEW 1: EXCLUSIONS MODE -->
+  <div id="exclusionsView" class="view-section">
+    <!-- Stat Row -->
+    <section class="stat-row">
+      <div class="stat-card ember-card">
+        <span class="stat-value" id="statPresetsCount">0</span>
+        <span class="stat-label">ПРЕСЕТОВ</span>
+      </div>
+      <div class="stat-card limestone-card">
+        <span class="stat-value" id="statGroupsCount">0</span>
+        <span class="stat-label">ГРУПП ВСЕГО</span>
+      </div>
+    </section>
+
+    <!-- Search & Create Bar -->
+    <div class="search-section">
+      <div class="search-pill">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="searchInput" placeholder="Поиск пресета по названию..." autocomplete="off">
+        <button id="btnClearSearch" class="btn-clear hidden">&times;</button>
+      </div>
+      <button id="btnOpenCreate" class="btn-ember-pill btn-icon-only" title="Новый пресет">
+        +
+      </button>
+    </div>
+
+    <!-- Presets List Container -->
+    <main class="main-content">
+      <div id="presetsList" class="presets-container"></div>
+    </main>
+  </div>
+
+  <!-- VIEW 2: MAILINGS MODE -->
+  <div id="mailingsView" class="view-section hidden">
+    <main class="main-content">
+      <div class="mailing-card">
+        <h3 class="mailing-card-title">МАССОВОЕ СОЗДАНИЕ РАССЫЛКИ</h3>
+        <p class="mailing-desc">Автоматическое заполнение полей рассылки (Название, Текст, Дата отправки и Пресет исключений) в Senler.</p>
+
+        <div class="form-group">
+          <label for="mailTitle" class="form-label">НАЗВАНИЕ РАССЫЛКИ</label>
+          <input type="text" id="mailTitle" class="caldera-input" placeholder="Например: Анонс нового курса 2026">
+        </div>
+
+        <div class="form-group">
+          <div class="label-with-tools">
+            <label for="mailMessage" class="form-label">ТЕКСТ СООБЩЕНИЯ</label>
+            <div class="fmt-toolbar" id="fmtToolbar">
+              <button type="button" class="btn-fmt" data-fmt="bold" title="Жирный текст (**текст** или Ctrl+B)"><b>Ж</b></button>
+              <button type="button" class="btn-fmt" data-fmt="italic" title="Курсив (*текст* или Ctrl+I)"><i>К</i></button>
+              <button type="button" class="btn-fmt" data-fmt="underline" title="Подчеркнутый (<u>текст</u> или Ctrl+U)"><u>Ч</u></button>
+              <button type="button" class="btn-fmt" data-fmt="strike" title="Зачеркнутый (~текст~)"><s>S</s></button>
+              <button type="button" class="btn-fmt" data-fmt="link" title="Вставить ссылку ([текст](url))">🔗</button>
+            </div>
+          </div>
+          <textarea id="mailMessage" class="caldera-textarea" placeholder="Привет! Напоминаем о старте занятий..."></textarea>
+          <div class="fmt-hint">Форматирование: **жирный**, *курсив*, <u>подчеркнутый</u>, ~зачеркнутый~, [ссылка](url)</div>
+        </div>
+
+        <div class="form-group">
+          <label for="mailDateTime" class="form-label">ДАТА И ВРЕМЯ ОТПРАВКИ</label>
+          <input type="datetime-local" id="mailDateTime" class="caldera-input">
+        </div>
+
+        <div class="form-group">
+          <label for="mailPresetSelect" class="form-label">ПРЕСЕТ ИСКЛЮЧЕНИЙ</label>
+          <div class="select-wrapper">
+            <select id="mailPresetSelect" class="caldera-select"></select>
+          </div>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label class="caldera-checkbox-label">
+            <input type="checkbox" id="chkCopyAttachments" checked>
+            <span class="checkbox-text">Копировать фото и вложения из первой вкладки</span>
+          </label>
+        </div>
+
+        <div class="mailing-actions">
+          <button id="btnApplyMailingCurrent" class="btn-secondary-pill">
+            Заполнить текущую вкладку
+          </button>
+          <button id="btnApplyMailingAll" class="btn-ember-pill">
+            🚀 Заполнить все вкладки Senler
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL: Apply Preset Target Selection Choice -->
+  <div id="applyTargetModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>КУДА ПРИМЕНИТЬ ПРЕСЕТ?</h2>
+        <button id="btnCloseApplyTarget" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Вы выбрали пресет: <strong id="targetPresetNameName" style="color: var(--color-ember);">""</strong>.</p>
+        <p class="modal-desc">Укажите область применения пресета исключений:</p>
+        
+        <div class="apply-choice-actions">
+          <button id="btnApplyCurrentTabOnly" class="btn-secondary-pill btn-choice">
+            <span class="choice-title">Только к этой вкладке</span>
+            <span class="choice-sub">Применит исключения на активной открытой странице Senler</span>
+          </button>
+
+          <button id="btnApplyAllTabs" class="btn-ember-pill btn-choice">
+            <span class="choice-title">🚀 Ко всем открытым вкладкам Senler</span>
+            <span class="choice-sub" id="lblSenlerTabsCount">Параллельно выполнит во всех найденных вкладках</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create/Edit Form Modal -->
+  <div id="formModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="formTitle">НОВЫЙ ПРЕСЕТ</h2>
+        <button id="btnCloseModal" class="modal-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="presetId">
+
+        <div class="form-group">
+          <label for="presetName" class="form-label">НАЗВАНИЕ ПРЕСЕТА</label>
+          <input type="text" id="presetName" class="caldera-input" placeholder="Например: Исключения для рассылки СШ">
+        </div>
+
+        <div class="form-group">
+          <label for="presetGroups" class="form-label">
+            СПИСОК НАЗВАНИЙ ГРУПП <span class="hint">(по одной на строку)</span>
+          </label>
+          <textarea id="presetGroups" class="caldera-textarea" placeholder="[Маркетинг] Прошлый год — 2025&#10;[2025/2026 уч.год] 1 курс&#10;[КМ] ОК Апрель - 25/26"></textarea>
+          <div class="textarea-footer">
+            <span id="groupCounter" class="sulfur-tag">0 групп</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnCancelForm" class="btn-secondary-pill">Отмена</button>
+        <button id="btnSavePreset" class="btn-ember-pill">Сохранить пресет</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Execution Results Modal -->
+  <div id="resultsModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-card-lg">
+      <div class="modal-header">
+        <h2>ОТЧЕТ ОБ ИСКЛЮЧЕНИИ</h2>
+        <button id="btnCloseResults" class="modal-close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="resultsSummary" class="results-summary"></div>
+        
+        <div class="table-wrapper">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th class="col-query">ЗАПРОС В ПРЕСЕТЕ</th>
+                <th class="col-status">СТАТУС</th>
+                <th class="col-match">SENLER ГРУППА</th>
+              </tr>
+            </thead>
+            <tbody id="resultsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer modal-footer-space">
+        <button id="btnCopyMissing" class="btn-secondary-pill hidden">Скопировать не найденные</button>
+        <button id="btnDoneResults" class="btn-ember-pill">Отлично</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import / Export Modal -->
+  <div id="importExportModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>ИМПОРТ И ЭКСПОРТ</h2>
+        <button id="btnCloseImportExport" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Экспортируйте пресеты в JSON файл для резервной копии или загрузите готовый файл шаблонов.</p>
+        <div class="import-export-actions">
+          <button id="btnExportJSON" class="btn-secondary-pill">Скачать экспорт (JSON)</button>
+          <label for="importFileInput" class="btn-ember-pill cursor-pointer text-center">Загрузить из файла</label>
+          <input type="file" id="importFileInput" accept=".json" class="hidden">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
