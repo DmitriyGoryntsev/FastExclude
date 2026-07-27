@@ -562,6 +562,12 @@ body {
   box-shadow: var(--shadow-focus);
 }
 
+.caldera-select option {
+  background-color: #FFFFFF;
+  color: #0F172A;
+  padding: 6px 12px;
+}
+
 .mailing-actions {
   display: flex;
   flex-direction: column;

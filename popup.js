@@ -76,8 +76,9 @@ const toastContainer = document.getElementById('toastContainer');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  loadPresets();
-  loadMailingDraft();
+  loadPresets(() => {
+    loadMailingDraft();
+  });
 
   // Mode Tabs Switching
   tabExclusions.addEventListener('click', () => switchMode('exclusions'));
@@ -162,12 +163,13 @@ function switchMode(mode) {
 }
 
 // Load presets from chrome.storage.local
-function loadPresets() {
+function loadPresets(callback) {
   chrome.storage.local.get([STORAGE_KEY], (result) => {
     currentPresets = result[STORAGE_KEY] || [];
     renderPresets();
     updateStats();
     populateMailingPresetDropdown();
+    if (typeof callback === 'function') callback();
   });
 }
 
@@ -248,12 +250,14 @@ function updateStats() {
   const totalPresets = currentPresets.length;
   const totalGroups = currentPresets.reduce((sum, p) => sum + (p.groups ? p.groups.length : 0), 0);
 
-  statPresetsCount.textContent = totalPresets;
-  statGroupsCount.textContent = totalGroups;
+  if (statPresetsCount) statPresetsCount.textContent = totalPresets;
+  if (statGroupsCount) statGroupsCount.textContent = totalGroups;
 }
 
 // Populate Preset Dropdown in Mailing Creator
-function populateMailingPresetDropdown() {
+function populateMailingPresetDropdown(preserveId = null) {
+  if (!mailPresetSelect) return;
+  const currentVal = preserveId || mailPresetSelect.value;
   mailPresetSelect.innerHTML = '<option value="">Без пресета исключений</option>';
   currentPresets.forEach(p => {
     const opt = document.createElement('option');
@@ -261,10 +265,14 @@ function populateMailingPresetDropdown() {
     opt.textContent = `${p.name} (${p.groups ? p.groups.length : 0} групп)`;
     mailPresetSelect.appendChild(opt);
   });
+  if (currentVal && currentPresets.some(p => p.id === currentVal)) {
+    mailPresetSelect.value = currentVal;
+  }
 }
 
 // Save & Load Mailing Draft Form
 function saveMailingDraft() {
+  if (!mailPresetSelect) return;
   const draft = {
     title: mailTitle.value,
     message: mailMessage.value,
@@ -278,10 +286,12 @@ function loadMailingDraft() {
   chrome.storage.local.get([MAILING_STATE_KEY], (res) => {
     const draft = res[MAILING_STATE_KEY];
     if (draft) {
-      mailTitle.value = draft.title || '';
-      mailMessage.value = draft.message || '';
-      mailDateTime.value = draft.datetime || '';
-      mailPresetSelect.value = draft.presetId || '';
+      if (mailTitle) mailTitle.value = draft.title || '';
+      if (mailMessage) mailMessage.value = draft.message || '';
+      if (mailDateTime) mailDateTime.value = draft.datetime || '';
+      if (draft.presetId && mailPresetSelect && currentPresets.some(p => p.id === draft.presetId)) {
+        mailPresetSelect.value = draft.presetId;
+      }
     }
   });
 }
