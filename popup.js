@@ -4,18 +4,41 @@
 
 const STORAGE_KEY = 'senler_presets';
 const MAILING_STATE_KEY = 'senler_mailing_draft';
+const CLONE_PRESETS_KEY = 'fast_exclude_clone_presets_v1';
+const PLATFORM_KEY = 'fast_exclude_selected_platform';
+
+const DEFAULT_CLONE_PRESETS = [
+  { id: 'cp_1', label: '👨‍👩‍👧 Родители', keyword: 'родители' },
+  { id: 'cp_2', label: '🎓 СШ (Средняя школа)', keyword: 'СШ' },
+  { id: 'cp_3', label: '📚 ЕГЭ', keyword: 'ЕГЭ' },
+  { id: 'cp_4', label: '📝 ОГЭ', keyword: 'ОГЭ' }
+];
 
 // State
 let currentPresets = [];
+let currentClonePresets = [];
 let selectedPresetForApply = null;
 let lastExecutionResults = null;
-let activeMode = 'exclusions'; // 'exclusions' | 'mailings'
+let activeMode = 'exclusions'; // 'exclusions' | 'mailings' | 'clone'
+let currentPlatform = 'senler'; // 'senler' | 'salebot'
+let currentSelectedImage = null; // { base64: string, name: string, size: string, type: string }
 
-// DOM Elements - Navigation Tabs
+// DOM Elements - Navigation Tabs & Platform Selector
+const modeNav = document.getElementById('modeNav');
+const platformSelectorView = document.getElementById('platformSelectorView');
+const btnSwitchPlatform = document.getElementById('btnSwitchPlatform');
+const platformBadgeText = document.getElementById('platformBadgeText');
+const btnChooseSenler = document.getElementById('btnChooseSenler');
+const btnChooseSalebot = document.getElementById('btnChooseSalebot');
+const cardSelectSenler = document.getElementById('cardSelectSenler');
+const cardSelectSalebot = document.getElementById('cardSelectSalebot');
+
 const tabExclusions = document.getElementById('tabExclusions');
 const tabMailings = document.getElementById('tabMailings');
+const tabClone = document.getElementById('tabClone');
 const exclusionsView = document.getElementById('exclusionsView');
 const mailingsView = document.getElementById('mailingsView');
+const cloneView = document.getElementById('cloneView');
 
 // Exclusions View Elements
 const presetsList = document.getElementById('presetsList');
@@ -35,7 +58,29 @@ const mailDateTime = document.getElementById('mailDateTime');
 const mailPresetSelect = document.getElementById('mailPresetSelect');
 const btnApplyMailingCurrent = document.getElementById('btnApplyMailingCurrent');
 const btnApplyMailingAll = document.getElementById('btnApplyMailingAll');
-const chkCopyAttachments = document.getElementById('chkCopyAttachments');
+const imageUploadBox = document.getElementById('imageUploadBox');
+const mailImageInput = document.getElementById('mailImageInput');
+const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+const imagePreviewWrapper = document.getElementById('imagePreviewWrapper');
+const imagePreviewThumb = document.getElementById('imagePreviewThumb');
+const imageFileName = document.getElementById('imageFileName');
+const imageFileSize = document.getElementById('imageFileSize');
+const btnRemoveImage = document.getElementById('btnRemoveImage');
+
+// Clone View Elements
+const cloneKeywordInput = document.getElementById('cloneKeyword');
+const btnApplyCloneCurrent = document.getElementById('btnApplyCloneCurrent');
+const btnApplyCloneAll = document.getElementById('btnApplyCloneAll');
+const clonePresetPills = document.getElementById('clonePresetPills');
+const btnOpenAddClonePreset = document.getElementById('btnOpenAddClonePreset');
+
+// Add Clone Preset Modal Elements
+const addCloneModal = document.getElementById('addCloneModal');
+const btnCloseAddClone = document.getElementById('btnCloseAddClone');
+const btnCancelAddClone = document.getElementById('btnCancelAddClone');
+const btnSaveAddClone = document.getElementById('btnSaveAddClone');
+const cloneLabelInput = document.getElementById('cloneLabelInput');
+const cloneKeywordModalInput = document.getElementById('cloneKeywordModalInput');
 
 // Apply Choice Target Modal
 const applyTargetModal = document.getElementById('applyTargetModal');
@@ -71,18 +116,123 @@ const btnCloseImportExport = document.getElementById('btnCloseImportExport');
 const btnExportJSON = document.getElementById('btnExportJSON');
 const importFileInput = document.getElementById('importFileInput');
 
-// Toast Container
-const toastContainer = document.getElementById('toastContainer');
+// Platform Selector Functions
+function loadPlatformChoice(callback) {
+  chrome.storage.local.get([PLATFORM_KEY], (res) => {
+    const saved = res[PLATFORM_KEY];
+    if (saved) {
+      currentPlatform = saved;
+      applyPlatformUI(saved);
+      if (typeof callback === 'function') callback(saved);
+    } else {
+      openPlatformSelectorScreen();
+    }
+  });
+}
+
+function selectPlatform(platform) {
+  currentPlatform = platform;
+  chrome.storage.local.set({ [PLATFORM_KEY]: platform }, () => {
+    applyPlatformUI(platform);
+    showMainViews();
+  });
+}
+
+function openPlatformSelectorScreen() {
+  if (platformSelectorView) platformSelectorView.classList.remove('hidden');
+  if (modeNav) modeNav.classList.add('hidden');
+  if (exclusionsView) exclusionsView.classList.add('hidden');
+  if (mailingsView) mailingsView.classList.add('hidden');
+  if (cloneView) cloneView.classList.add('hidden');
+
+  if (cardSelectSenler && cardSelectSalebot) {
+    cardSelectSenler.className = `platform-card platform-senler ${currentPlatform === 'senler' ? 'active' : ''}`;
+    cardSelectSalebot.className = `platform-card platform-salebot ${currentPlatform === 'salebot' ? 'active' : ''}`;
+  }
+}
+
+function showMainViews() {
+  if (platformSelectorView) platformSelectorView.classList.add('hidden');
+  if (modeNav) modeNav.classList.remove('hidden');
+  switchMode(activeMode);
+}
+
+function applyPlatformUI(platform) {
+  const platformBadgeIcon = document.getElementById('platformBadgeIcon');
+  const platformBadgeText = document.getElementById('platformBadgeText');
+
+  if (platformBadgeIcon) {
+    platformBadgeIcon.textContent = platform === 'senler' ? '💚' : '✈️';
+  }
+  if (platformBadgeText) {
+    platformBadgeText.textContent = platform === 'senler' ? 'Senler' : 'Salebot';
+  }
+
+  if (cardSelectSenler && cardSelectSalebot) {
+    cardSelectSenler.className = `platform-card platform-senler ${platform === 'senler' ? 'active' : ''}`;
+    cardSelectSalebot.className = `platform-card platform-salebot ${platform === 'salebot' ? 'active' : ''}`;
+  }
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+  loadPlatformChoice(() => {
+    showMainViews();
+  });
+
   loadPresets(() => {
     loadMailingDraft();
+    loadClonePresets();
   });
+
+  // Platform Card Interactive Listeners
+  if (cardSelectSenler) cardSelectSenler.addEventListener('click', () => selectPlatform('senler'));
+  if (cardSelectSalebot) cardSelectSalebot.addEventListener('click', () => selectPlatform('salebot'));
+  if (btnChooseSenler) btnChooseSenler.addEventListener('click', (e) => { e.stopPropagation(); selectPlatform('senler'); });
+  if (btnChooseSalebot) btnChooseSalebot.addEventListener('click', (e) => { e.stopPropagation(); selectPlatform('salebot'); });
+  if (btnSwitchPlatform) btnSwitchPlatform.addEventListener('click', () => openPlatformSelectorScreen());
 
   // Mode Tabs Switching
   tabExclusions.addEventListener('click', () => switchMode('exclusions'));
   tabMailings.addEventListener('click', () => switchMode('mailings'));
+  if (tabClone) tabClone.addEventListener('click', () => switchMode('clone'));
+  updateSenlerTabCounts();
+
+  // Quick Clone Mailings Listeners
+  if (btnApplyCloneCurrent) btnApplyCloneCurrent.addEventListener('click', handleApplyCloneCurrent);
+  if (btnApplyCloneAll) btnApplyCloneAll.addEventListener('click', handleApplyCloneAll);
+
+  if (clonePresetPills) {
+    clonePresetPills.addEventListener('click', (e) => {
+      // Check if delete icon was clicked
+      const delBtn = e.target.closest('.clone-pill-del');
+      if (delBtn) {
+        e.stopPropagation();
+        const idToDelete = delBtn.getAttribute('data-id');
+        deleteClonePreset(idToDelete);
+        return;
+      }
+
+      const pill = e.target.closest('.clone-tag-pill');
+      if (!pill) return;
+      
+      const keyword = pill.getAttribute('data-keyword');
+      if (keyword && cloneKeywordInput) {
+        cloneKeywordInput.value = keyword;
+        renderClonePresets();
+      }
+    });
+  }
+
+  if (cloneKeywordInput) {
+    cloneKeywordInput.addEventListener('input', renderClonePresets);
+  }
+
+  // Add Clone Preset Modal Listeners
+  if (btnOpenAddClonePreset) btnOpenAddClonePreset.addEventListener('click', openAddCloneModal);
+  if (btnCloseAddClone) btnCloseAddClone.addEventListener('click', closeAddCloneModal);
+  if (btnCancelAddClone) btnCancelAddClone.addEventListener('click', closeAddCloneModal);
+  if (btnSaveAddClone) btnSaveAddClone.addEventListener('click', handleSaveAddClone);
 
   // Search & Filter
   searchInput.addEventListener('input', handleSearch);
@@ -107,6 +257,42 @@ document.addEventListener('DOMContentLoaded', () => {
   mailMessage.addEventListener('input', saveMailingDraft);
   mailDateTime.addEventListener('change', saveMailingDraft);
   mailPresetSelect.addEventListener('change', saveMailingDraft);
+
+  // Image Upload Box Listeners
+  if (imageUploadBox && mailImageInput) {
+    imageUploadBox.addEventListener('click', (e) => {
+      if (btnRemoveImage && (e.target === btnRemoveImage || btnRemoveImage.contains(e.target))) return;
+      mailImageInput.click();
+    });
+
+    mailImageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) processImageFile(file);
+    });
+
+    imageUploadBox.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      imageUploadBox.classList.add('dragover');
+    });
+
+    imageUploadBox.addEventListener('dragleave', () => {
+      imageUploadBox.classList.remove('dragover');
+    });
+
+    imageUploadBox.addEventListener('drop', (e) => {
+      e.preventDefault();
+      imageUploadBox.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) processImageFile(file);
+    });
+
+    if (btnRemoveImage) {
+      btnRemoveImage.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeSelectedImage();
+      });
+    }
+  }
 
   // Formatting Toolbar Listeners
   document.querySelectorAll('#fmtToolbar .btn-fmt').forEach(btn => {
@@ -146,19 +332,60 @@ document.addEventListener('DOMContentLoaded', () => {
   importFileInput.addEventListener('change', importPresetsJSON);
 });
 
-// Mode Switcher (Exclusions vs Mailings)
+// Mode Switcher (Exclusions vs Mailings vs Clone)
 function switchMode(mode) {
   activeMode = mode;
+  updateSenlerTabCounts();
   if (mode === 'exclusions') {
     tabExclusions.classList.add('active');
     tabMailings.classList.remove('active');
+    if (tabClone) tabClone.classList.remove('active');
     exclusionsView.classList.remove('hidden');
     mailingsView.classList.add('hidden');
-  } else {
+    if (cloneView) cloneView.classList.add('hidden');
+  } else if (mode === 'mailings') {
     tabMailings.classList.add('active');
     tabExclusions.classList.remove('active');
+    if (tabClone) tabClone.classList.remove('active');
     mailingsView.classList.remove('hidden');
     exclusionsView.classList.add('hidden');
+    if (cloneView) cloneView.classList.add('hidden');
+  } else if (mode === 'clone') {
+    if (tabClone) tabClone.classList.add('active');
+    tabExclusions.classList.remove('active');
+    tabMailings.classList.remove('active');
+    if (cloneView) cloneView.classList.remove('hidden');
+    exclusionsView.classList.add('hidden');
+    mailingsView.classList.add('hidden');
+  }
+}
+
+function updateSenlerTabCounts() {
+  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
+    chrome.tabs.query({ url: '*://*.senler.ru/*' }, (tabs) => {
+      const count = tabs ? tabs.length : 0;
+      
+      const btnApplyCloneAll = document.getElementById('btnApplyCloneAll');
+      if (btnApplyCloneAll) {
+        btnApplyCloneAll.textContent = count > 0 
+          ? `🚀 Скопировать во всех ${count} вкладках`
+          : '🚀 Скопировать во всех вкладках Senler';
+      }
+
+      const btnApplyMailingAll = document.getElementById('btnApplyMailingAll');
+      if (btnApplyMailingAll) {
+        btnApplyMailingAll.textContent = count > 0 
+          ? `🚀 Заполнить все ${count} вкладок Senler`
+          : '🚀 Заполнить все вкладки Senler';
+      }
+
+      const lblSenlerTabsCount = document.getElementById('lblSenlerTabsCount');
+      if (lblSenlerTabsCount) {
+        lblSenlerTabsCount.textContent = count > 0 
+          ? `Параллельно выполнит во всех ${count} найденных вкладках Senler`
+          : 'Параллельно выполнит во всех найденных вкладках Senler';
+      }
+    });
   }
 }
 
@@ -277,7 +504,8 @@ function saveMailingDraft() {
     title: mailTitle.value,
     message: mailMessage.value,
     datetime: mailDateTime.value,
-    presetId: mailPresetSelect.value
+    presetId: mailPresetSelect.value,
+    image: currentSelectedImage
   };
   chrome.storage.local.set({ [MAILING_STATE_KEY]: draft });
 }
@@ -292,8 +520,69 @@ function loadMailingDraft() {
       if (draft.presetId && mailPresetSelect && currentPresets.some(p => p.id === draft.presetId)) {
         mailPresetSelect.value = draft.presetId;
       }
+      if (draft.image) {
+        currentSelectedImage = draft.image;
+        renderImagePreview();
+      }
     }
   });
+}
+
+// Image File Helpers
+function processImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    showToast('Пожалуйста, выберите файл изображения (PNG, JPG, WEBP)', 'error');
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    showToast('Размер файла не должен превышать 10 МБ', 'error');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    currentSelectedImage = {
+      base64: e.target.result,
+      name: file.name,
+      size: formatFileSize(file.size),
+      type: file.type
+    };
+    renderImagePreview();
+    saveMailingDraft();
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeSelectedImage() {
+  currentSelectedImage = null;
+  if (mailImageInput) mailImageInput.value = '';
+  renderImagePreview();
+  saveMailingDraft();
+}
+
+function renderImagePreview() {
+  if (!uploadPlaceholder || !imagePreviewWrapper) return;
+  if (currentSelectedImage) {
+    uploadPlaceholder.classList.add('hidden');
+    imagePreviewWrapper.classList.remove('hidden');
+    if (imagePreviewThumb) imagePreviewThumb.src = currentSelectedImage.base64;
+    if (imageFileName) imageFileName.textContent = currentSelectedImage.name;
+    if (imageFileSize) imageFileSize.textContent = currentSelectedImage.size;
+  } else {
+    uploadPlaceholder.classList.remove('hidden');
+    imagePreviewWrapper.classList.add('hidden');
+    if (imagePreviewThumb) imagePreviewThumb.src = '';
+    if (imageFileName) imageFileName.textContent = '';
+    if (imageFileSize) imageFileSize.textContent = '';
+  }
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
 // Apply Formatting Tags to Textarea Selection
@@ -487,8 +776,8 @@ function handleApplyToAllTabs() {
 // Mailing Creator: Fill Current Tab
 function handleApplyMailingCurrent() {
   const mailData = getMailingFormData();
-  if (!mailData.title && !mailData.message) {
-    showToast('Заполните название или текст рассылки', 'error');
+  if (!mailData.title && !mailData.message && !mailData.imageData) {
+    showToast('Заполните поле, добавьте изображение или выберите пресет', 'error');
     return;
   }
 
@@ -501,60 +790,29 @@ function handleApplyMailingCurrent() {
     }
 
     const tab = tabs[0];
-
-    const runFill = (attachmentsData = null) => {
-      if (attachmentsData) {
-        mailData.attachments = attachmentsData;
+    chrome.scripting.executeScript(
+      {
+        target: { tabId: tab.id },
+        world: 'MAIN',
+        func: runMailingAutomation,
+        args: [mailData]
+      },
+      (results) => {
+        if (results && results[0] && results[0].result && results[0].result.success) {
+          showToast('Форма рассылки успешно заполнена!', 'success');
+        } else {
+          showToast('Ошибка заполнения формы рассылки', 'error');
+        }
       }
-      chrome.scripting.executeScript(
-        {
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: runMailingAutomation,
-          args: [mailData]
-        },
-        (results) => {
-          if (results && results[0] && results[0].result && results[0].result.success) {
-            showToast('Форма рассылки успешно заполнена!', 'success');
-          } else {
-            showToast('Ошибка заполнения формы рассылки', 'error');
-          }
-        }
-      );
-    };
-
-    if (chkCopyAttachments && chkCopyAttachments.checked) {
-      chrome.scripting.executeScript(
-        {
-          target: { tabId: tab.id },
-          world: 'MAIN',
-          func: () => {
-            const $ = window.jQuery || window.$;
-            if (!$) return null;
-            const $field = $('.js-messageField').first();
-            if (!$field.length) return null;
-            return {
-              dataItems: $field.attr('data-items') || '',
-              html: $field.html() || ''
-            };
-          }
-        },
-        (results) => {
-          const atts = results && results[0] && results[0].result;
-          runFill(atts);
-        }
-      );
-    } else {
-      runFill();
-    }
+    );
   });
 }
 
 // Mailing Creator: Fill All Open Senler Tabs
 function handleApplyMailingAll() {
   const mailData = getMailingFormData();
-  if (!mailData.title && !mailData.message) {
-    showToast('Заполните название или текст рассылки', 'error');
+  if (!mailData.title && !mailData.message && !mailData.imageData) {
+    showToast('Заполните поле, добавьте изображение или выберите пресет', 'error');
     return;
   }
 
@@ -564,58 +822,24 @@ function handleApplyMailingAll() {
       return;
     }
 
-    chrome.tabs.query({ active: true, currentWindow: true }, (activeTabs) => {
-      const activeTab = activeTabs[0];
+    showToast(`Заполнение рассылки во всех ${tabs.length} вкладках...`, 'info');
+    let completed = 0;
 
-      const runFillAll = (attachmentsData = null) => {
-        if (attachmentsData) {
-          mailData.attachments = attachmentsData;
-        }
-        showToast(`Заполнение рассылки во всех ${tabs.length} вкладках...`, 'info');
-        let completed = 0;
-
-        tabs.forEach(tab => {
-          chrome.scripting.executeScript(
-            {
-              target: { tabId: tab.id },
-              world: 'MAIN',
-              func: runMailingAutomation,
-              args: [mailData]
-            },
-            () => {
-              completed++;
-              if (completed === tabs.length) {
-                showToast(`Форма рассылки заполнена во всех ${completed} вкладках!`, 'success');
-              }
-            }
-          );
-        });
-      };
-
-      if (activeTab && activeTab.url.includes('senler.ru') && chkCopyAttachments && chkCopyAttachments.checked) {
-        chrome.scripting.executeScript(
-          {
-            target: { tabId: activeTab.id },
-            world: 'MAIN',
-            func: () => {
-              const $ = window.jQuery || window.$;
-              if (!$) return null;
-              const $field = $('.js-messageField').first();
-              if (!$field.length) return null;
-              return {
-                dataItems: $field.attr('data-items') || '',
-                html: $field.html() || ''
-              };
-            }
-          },
-          (results) => {
-            const atts = results && results[0] && results[0].result;
-            runFillAll(atts);
+    tabs.forEach(tab => {
+      chrome.scripting.executeScript(
+        {
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: runMailingAutomation,
+          args: [mailData]
+        },
+        () => {
+          completed++;
+          if (completed === tabs.length) {
+            showToast(`Форма рассылки заполнена во всех ${completed} вкладках!`, 'success');
           }
-        );
-      } else {
-        runFillAll();
-      }
+        }
+      );
     });
   });
 }
@@ -627,7 +851,8 @@ function getMailingFormData() {
     message: mailMessage.value.trim(),
     datetime: mailDateTime.value,
     presetGroups: selectedPreset ? selectedPreset.groups : [],
-    presetName: selectedPreset ? selectedPreset.name : ''
+    presetName: selectedPreset ? selectedPreset.name : '',
+    imageData: currentSelectedImage
   };
 }
 
@@ -814,19 +1039,30 @@ function importPresetsJSON(e) {
   reader.readAsText(file);
 }
 
-// Toast Notification
+// Embedded Status & Feedback Notice Helper (Replaces floating toast popups)
 function showToast(message, type = 'info') {
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+  console.log(`[FastExclude Status - ${type}]:`, message);
 
-  toastContainer.appendChild(toast);
+  const cloneStatusText = document.getElementById('cloneStatusText');
+  const cloneStatusNotice = document.getElementById('cloneStatusNotice');
+  const mailingStatusText = document.getElementById('mailingStatusText');
+  const mailingStatusNotice = document.getElementById('mailingStatusNotice');
 
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transition = 'opacity 0.2s ease';
-    setTimeout(() => toast.remove(), 200);
-  }, 3500);
+  if (cloneStatusText && cloneStatusNotice) {
+    cloneStatusText.textContent = message;
+    cloneStatusNotice.className = `status-notice status-notice-${type}`;
+  }
+
+  if (mailingStatusText && mailingStatusNotice) {
+    mailingStatusText.textContent = message;
+    mailingStatusNotice.className = `status-notice status-notice-${type}`;
+  }
+
+  if (statStatus) {
+    if (type === 'info') statStatus.textContent = 'RUNNING';
+    else if (type === 'success') statStatus.textContent = 'READY';
+    else if (type === 'error') statStatus.textContent = 'ERROR';
+  }
 }
 
 // Helpers
@@ -1245,6 +1481,132 @@ async function runMailingAutomation(mailData) {
     } catch (errAttach) {
       console.warn('[FastExclude] Ошибка при копировании вложений:', errAttach);
     }
+
+    // 2d. Автоматическая загрузка фото из расширения (Targeted Photo Uploader Solver)
+    try {
+      if (mailData.imageData && mailData.imageData.base64) {
+        console.log('[FastExclude] Начало автоматической загрузки изображения:', mailData.imageData.name);
+
+        const base64Str = mailData.imageData.base64;
+        const parts = base64Str.split(',');
+        
+        let mimeString = mailData.imageData.type || '';
+        if (!mimeString || mimeString === 'application/octet-stream') {
+          const match = base64Str.match(/^data:(image\/[a-zA-Z0-9+-]+);base64,/);
+          if (match) {
+            mimeString = match[1];
+          } else {
+            mimeString = 'image/png';
+          }
+        }
+
+        let fileName = mailData.imageData.name || 'photo.png';
+        if (!fileName.match(/\.(png|jpg|jpeg|webp|gif)$/i)) {
+          if (mimeString.includes('jpeg') || mimeString.includes('jpg')) fileName += '.jpg';
+          else if (mimeString.includes('webp')) fileName += '.webp';
+          else fileName += '.png';
+        }
+
+        const byteString = atob(parts[1] || parts[0]);
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([ab], { type: mimeString });
+        const file = new File([blob], fileName, { type: mimeString, lastModified: Date.now() });
+
+        const dt = new DataTransfer();
+        dt.items.add(file);
+
+        let fileApplied = false;
+
+        const applyFileToImageTargets = () => {
+          if (fileApplied) return 0; // Предотвращаем дубликаты!
+
+          let count = 0;
+          // Фильтруем файловые инпуты: только для изображений или находящиеся внутри модального окна фото
+          const $fileInputs = $('input[type="file"]').not('#main-header *, .header-new *, #sidebar *').filter(function() {
+            const accept = ($(this).attr('accept') || '').toLowerCase();
+            const inPhotoModal = $(this).closest('.modal, .lay-box, [class*="photo"], [id*="photo"]').length > 0;
+            if (accept.includes('video') || accept.includes('audio') || accept.includes('doc')) return false;
+            return accept.includes('image') || inPhotoModal || (accept === '' && inPhotoModal);
+          });
+
+          console.log('[FastExclude Debug] Найдено инпутов фото:', $fileInputs.length);
+
+          if ($fileInputs.length) {
+            $fileInputs.each(function() {
+              try {
+                this.files = dt.files;
+                this.dispatchEvent(new Event('change', { bubbles: true }));
+                this.dispatchEvent(new Event('input', { bubbles: true }));
+                $(this).trigger('change').trigger('input');
+                count++;
+              } catch(e) {
+                console.warn('[FastExclude] Ошибка установки files:', e);
+              }
+            });
+          }
+
+          // Диспатчим drag & drop ТОЛЬКО на дропзоны в модальном окне прикрепления фото
+          const $imageDropzones = $('.modal:visible .dropzone, .lay-box:visible .dropzone, [id*="photo"] .dropzone').filter(function() {
+            const txt = $(this).text().toLowerCase();
+            return !txt.includes('видео') && !txt.includes('аудио') && !txt.includes('документ');
+          });
+
+          $imageDropzones.each(function() {
+            try {
+              const dragoverEvent = new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt });
+              const dropEvent = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt });
+              this.dispatchEvent(dragoverEvent);
+              this.dispatchEvent(dropEvent);
+              count++;
+            } catch(e) {}
+          });
+
+          if (count > 0) {
+            fileApplied = true;
+          }
+          return count;
+        };
+
+        // 1. Пытаемся передать файл в модальное окно, если оно уже было открыто
+        const initialCount = applyFileToImageTargets();
+
+        // 2. Если окно не открыто, открываем меню "Прикрепить" -> "Фотография"
+        if (initialCount === 0) {
+          const $attachBtn = $('button, a, div, span').filter(function() {
+            const txt = $(this).text().trim();
+            return txt === 'Прикрепить' || txt.startsWith('Прикрепить');
+          }).first();
+
+          if ($attachBtn.length) {
+            console.log('[FastExclude Debug] Клик по кнопке Прикрепить');
+            $attachBtn[0].click();
+
+            setTimeout(() => {
+              const $photoItem = $('a, button, li, div, span').filter(function() {
+                const txt = $(this).text().trim();
+                return txt === 'Фотография' || txt.includes('Фотография');
+              }).first();
+
+              if ($photoItem.length) {
+                console.log('[FastExclude Debug] Клик по пункту Фотография');
+                $photoItem[0].click();
+
+                setTimeout(() => {
+                  const injectedCount = applyFileToImageTargets();
+                  console.log('[FastExclude] Изображение прикреплено к Senler без дублирования:', injectedCount);
+                }, 300);
+              }
+            }, 200);
+          }
+        }
+      }
+    } catch (errImg) {
+      console.warn('[FastExclude] Ошибка загрузки изображения:', errImg);
+    }
   } catch (errMsg) {
     console.warn('[FastExclude] Ошибка при установке Текста:', errMsg);
   }
@@ -1454,5 +1816,395 @@ async function runMailingAutomation(mailData) {
     }
 
     return { addedCount };
+  }
+}
+
+// HTML Helper
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Clone Presets Storage & Management
+function loadClonePresets(callback) {
+  chrome.storage.local.get([CLONE_PRESETS_KEY], (result) => {
+    if (result[CLONE_PRESETS_KEY] && Array.isArray(result[CLONE_PRESETS_KEY]) && result[CLONE_PRESETS_KEY].length > 0) {
+      currentClonePresets = result[CLONE_PRESETS_KEY];
+    } else {
+      currentClonePresets = [...DEFAULT_CLONE_PRESETS];
+      chrome.storage.local.set({ [CLONE_PRESETS_KEY]: currentClonePresets });
+    }
+    renderClonePresets();
+    if (typeof callback === 'function') callback();
+  });
+}
+
+function saveClonePresets() {
+  chrome.storage.local.set({ [CLONE_PRESETS_KEY]: currentClonePresets }, () => {
+    renderClonePresets();
+  });
+}
+
+function renderClonePresets() {
+  if (!clonePresetPills) return;
+  clonePresetPills.innerHTML = '';
+
+  const activeKeyword = cloneKeywordInput ? cloneKeywordInput.value.trim().toLowerCase() : '';
+
+  currentClonePresets.forEach(preset => {
+    const pill = document.createElement('div');
+    const isActive = activeKeyword && (preset.keyword.toLowerCase() === activeKeyword);
+    pill.className = `clone-tag-pill ${isActive ? 'active' : ''}`;
+    pill.setAttribute('data-id', preset.id);
+    pill.setAttribute('data-keyword', preset.keyword);
+
+    pill.innerHTML = `
+      <span class="clone-pill-label">${escapeHtml(preset.label)}</span>
+      <span class="clone-pill-del" title="Удалить пресет" data-id="${preset.id}">&times;</span>
+    `;
+
+    clonePresetPills.appendChild(pill);
+  });
+}
+
+function openAddCloneModal() {
+  if (!addCloneModal) return;
+  if (cloneLabelInput) cloneLabelInput.value = '';
+  if (cloneKeywordModalInput) cloneKeywordModalInput.value = '';
+  addCloneModal.classList.remove('hidden');
+  if (cloneLabelInput) cloneLabelInput.focus();
+}
+
+function closeAddCloneModal() {
+  if (addCloneModal) addCloneModal.classList.add('hidden');
+}
+
+function handleSaveAddClone() {
+  const label = cloneLabelInput ? cloneLabelInput.value.trim() : '';
+  const keyword = cloneKeywordModalInput ? cloneKeywordModalInput.value.trim() : '';
+
+  if (!label || !keyword) {
+    showToast('Укажите название кнопки и ключевое слово', 'error');
+    return;
+  }
+
+  const newPreset = {
+    id: 'cp_' + Date.now(),
+    label,
+    keyword
+  };
+
+  currentClonePresets.push(newPreset);
+  if (cloneKeywordInput) cloneKeywordInput.value = keyword;
+
+  saveClonePresets();
+  closeAddCloneModal();
+  showToast(`Пресет "${label}" добавлен!`, 'success');
+}
+
+function deleteClonePreset(id) {
+  currentClonePresets = currentClonePresets.filter(p => p.id !== id);
+  saveClonePresets();
+  showToast('Пресет удалён', 'info');
+}
+
+// Quick Clone Mailings Handlers
+function handleApplyCloneCurrent() {
+  const keyword = cloneKeywordInput ? cloneKeywordInput.value.trim() : '';
+  if (!keyword) {
+    showToast('Укажите ключевое слово для поиска рассылки', 'error');
+    return;
+  }
+
+  showToast(`Поиск и копирование рассылки "${keyword}" в текущей вкладке...`, 'info');
+
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (!tabs || !tabs[0] || !tabs[0].url.includes('senler.ru')) {
+      showToast('Откройте страницу Senler для копирования', 'error');
+      return;
+    }
+
+    chrome.scripting.executeScript(
+      {
+        target: { tabId: tabs[0].id },
+        world: 'MAIN',
+        func: runCopyMailingAutomation,
+        args: [keyword]
+      },
+      (results) => {
+        if (chrome.runtime.lastError) {
+          showToast('Ошибка запуска: ' + chrome.runtime.lastError.message, 'error');
+        } else if (results && results[0] && results[0].result && results[0].result.success) {
+          showToast(`Копирование рассылки "${keyword}" запущено!`, 'success');
+        } else {
+          const msg = (results && results[0] && results[0].result && results[0].result.message) || 'Не удалось автоматически скопировать рассылку';
+          showToast(msg, 'error');
+        }
+      }
+    );
+  });
+}
+
+function handleApplyCloneAll() {
+  const keyword = cloneKeywordInput ? cloneKeywordInput.value.trim() : '';
+  if (!keyword) {
+    showToast('Укажите ключевое слово для поиска рассылки', 'error');
+    return;
+  }
+
+  chrome.tabs.query({ url: '*://*.senler.ru/*' }, (tabs) => {
+    if (!tabs || tabs.length === 0) {
+      showToast('Открытых вкладок Senler не найдено', 'error');
+      return;
+    }
+
+    showToast(`Запуск копирования рассылки "${keyword}" во всех ${tabs.length} вкладках...`, 'info');
+
+    let completed = 0;
+    tabs.forEach(tab => {
+      chrome.scripting.executeScript(
+        {
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: runCopyMailingAutomation,
+          args: [keyword]
+        },
+        () => {
+          completed++;
+          if (completed === tabs.length) {
+            showToast(`Копирование рассылки "${keyword}" выполнено во всех ${completed} вкладках!`, 'success');
+          }
+        }
+      );
+    });
+  });
+}
+
+function runCopyMailingAutomation(targetKeyword) {
+  try {
+    console.log('[FastExclude] Авто-копирование рассылки по ключевому слову:', targetKeyword);
+    const kwLower = (targetKeyword || '').toLowerCase().trim();
+    if (!kwLower) {
+      return { success: false, message: 'Ключевое слово не задано' };
+    }
+
+    // 1. Проверяем URL: если не на странице рассылок, переходим или кликаем "Рассылки"
+    const isMailingPage = window.location.href.includes('/mailing') || window.location.hash.includes('mailing');
+    if (!isMailingPage) {
+      const $mailingMenu = $('a, div, span').filter(function() {
+        const txt = $(this).text().trim();
+        return txt === 'Рассылки' || ($(this).attr('href') && $(this).attr('href').includes('/mailing'));
+      }).first();
+
+      if ($mailingMenu.length) {
+        $mailingMenu[0].click();
+      } else {
+        window.location.href = '/mailing';
+      }
+    }
+
+    // 2. Функция поиска вкладки "Завершенно" / "Завершенные"
+    const switchTabAndExecute = () => {
+      const $tabs = $('a, button, li, span, div').filter(function() {
+        const txt = $(this).text().trim();
+        return txt.includes('Завершенно') || txt.includes('Завершенные');
+      });
+
+      if ($tabs.length) {
+        const $tabBtn = $tabs.first();
+        console.log('[FastExclude] Найдена вкладка Завершенно, кликаем...');
+        $tabBtn[0].click();
+      }
+
+      setTimeout(() => {
+        searchAndCopyRow();
+      }, 500);
+    };
+
+    // 3. Поиск карточки рассылки с подходящим ключевым словом
+    const searchAndCopyRow = () => {
+      console.log('[FastExclude] Ищем рассылку со словом:', targetKeyword);
+
+      // Находим первичные текстовые элементы со словом поиска
+      const $searchedElements = $('a, span, div, h4, td, p').filter(function() {
+        const text = $(this).text().toLowerCase();
+        return text.includes(kwLower) && $(this).children().length < 5;
+      });
+
+      console.log('[FastExclude] Найдено первичных текстовых тегов:', $searchedElements.length);
+
+      if (!$searchedElements.length) {
+        console.warn('[FastExclude] Рассылка со словом "' + targetKeyword + '" не найдена');
+        alert('Рассылка со словом "' + targetKeyword + '" не найдена в списке завершенных!');
+        return;
+      }
+
+      // Для каждого текстового элемента ищем его ИЗОЛИРОВАННЫЙ контейнер-карточку
+      const foundCards = [];
+      $searchedElements.each(function() {
+        let $curr = $(this);
+        let $card = null;
+
+        // Поднимаемся вверх от найденного текста к карточке рассылки
+        for (let i = 0; i < 7; i++) {
+          if (!$curr.length || $curr.is('body, html, .main-wrapper, .main-panel, .main-container, .left-panel')) break;
+          
+          const text = $curr.text();
+          const idMatches = text.match(/#\d+/g);
+
+          // Изолированная карточка содержит ровно 1 номер рассылки (например #15017471)
+          // или содержит метрики ("Получатели"), но НЕ является родителем списка
+          if (idMatches && idMatches.length === 1) {
+            $card = $curr;
+            break;
+          } else if ((text.includes('Получатели') || text.includes('Доставлено')) && (!idMatches || idMatches.length <= 1)) {
+            $card = $curr;
+            break;
+          }
+
+          $curr = $curr.parent();
+        }
+
+        if ($card && !foundCards.some(c => c[0] === $card[0])) {
+          foundCards.push($card);
+        }
+      });
+
+      console.log('[FastExclude] Выделено уникальных изолированных карточек:', foundCards.length);
+
+      if (foundCards.length === 0) {
+        console.warn('[FastExclude] Карточка рассылки не определена');
+        alert('Не удалось выделить карточку рассылки со словом "' + targetKeyword + '"');
+        return;
+      }
+
+      // Берем самую верхнюю карточку (самая свежая сверху)
+      const $targetCard = foundCards[0];
+      console.log('[FastExclude] Выбрана целевая карточка рассылки:', $targetCard[0]);
+
+      // Имитируем наведение мыши на карточку
+      $targetCard.trigger('mouseenter').trigger('mouseover');
+
+      setTimeout(() => {
+        let $actionBtn = $targetCard.find('button, a, div, span, .dropdown-toggle').filter(function() {
+          const txt = $(this).text().trim();
+          const title = $(this).attr('title') || '';
+          return txt === 'Еще' || txt.startsWith('Еще') || txt === 'Ещё' || txt === 'Копировать' || title.includes('Копировать') || $(this).hasClass('dropdown-toggle');
+        }).first();
+
+        if (!$actionBtn.length) {
+          $actionBtn = $targetCard.find('button, a, .dropdown').first();
+        }
+
+        if ($actionBtn.length) {
+          console.log('[FastExclude] Клик по кнопке действия в карточке:', $actionBtn[0]);
+          $actionBtn[0].click();
+          
+          setTimeout(() => {
+            triggerCopyClick($targetCard);
+          }, 300);
+        } else {
+          console.log('[FastExclude] Прямой поиск действия Копировать');
+          triggerCopyClick($targetCard);
+        }
+      }, 200);
+    };
+
+    // 4. Клик "Копировать" и ожидание модального окна #bulkCopyDeliveryModal
+    const triggerCopyClick = ($targetCard) => {
+      let $copyOpt = null;
+
+      // 1. Ищем пункт "Копировать" в открытом выпадающем меню
+      $copyOpt = $('.dropdown-menu.show a, .dropdown-menu:visible a, .dropdown-menu:visible button, [role="menu"]:visible a').filter(function() {
+        const txt = $(this).text().trim();
+        return txt === 'Копировать' || txt.includes('Копировать');
+      }).first();
+
+      // 2. Если меню не найдено, ищем внутри целевой карточки
+      if ((!$copyOpt || !$copyOpt.length) && $targetCard) {
+        $copyOpt = $targetCard.find('a, button, span').filter(function() {
+          const txt = $(this).text().trim();
+          const title = $(this).attr('title') || '';
+          return txt === 'Копировать' || txt.includes('Копировать') || title.includes('Копировать');
+        }).first();
+      }
+
+      // 3. Запасной выбор - любой пункт с 'Копировать'
+      if (!$copyOpt || !$copyOpt.length) {
+        $copyOpt = $('a:visible, button:visible').filter(function() {
+          const txt = $(this).text().trim();
+          return txt === 'Копировать' || txt.includes('Копировать');
+        }).first();
+      }
+
+      if ($copyOpt && $copyOpt.length) {
+        const targetEl = $copyOpt.is('a, button') ? $copyOpt[0] : ($copyOpt.closest('a, button')[0] || $copyOpt[0]);
+        console.log('[FastExclude] Нажатие на пункт "Копировать":', targetEl);
+        
+        // Одиночный клик без дублирования событий, чтобы избежать Bootstrap "Modal is transitioning"
+        targetEl.click();
+
+        // Ожидаем появление модального окна копирования #bulkCopyDeliveryModal
+        let attempts = 0;
+        let isProcessingModal = false;
+
+        const checkModalInterval = setInterval(() => {
+          attempts++;
+          if (isProcessingModal) return;
+
+          // Ищем модальное окно #bulkCopyDeliveryModal или активные диалоги
+          const $modal = $('#bulkCopyDeliveryModal, .modal.show, .modal.in, [aria-modal="true"]').filter(function() {
+            const id = $(this).attr('id') || '';
+            const cls = $(this).attr('class') || '';
+            if (id.includes('whatsNew') || cls.includes('vk-ads-modal')) return false;
+            return $(this).css('display') !== 'none' || $(this).hasClass('show') || $(this).hasClass('in');
+          }).last();
+
+          if ($modal.length) {
+            isProcessingModal = true;
+            console.log('[FastExclude] Обнаружено модальное окно копирования:', $modal[0]);
+
+            // Пауза 250мс для плавного завершения Bootstrap fade-анимации
+            setTimeout(() => {
+              const $startBtn = $modal.find('.btn-primary, .submit, button[type="submit"], button, a, div.btn').filter(function() {
+                const txt = $(this).text().trim().toLowerCase();
+                const isPrimary = $(this).hasClass('btn-primary') || $(this).hasClass('submit') || $(this).hasClass('btn-success') || $(this).attr('type') === 'submit';
+                const isCancel = $(this).hasClass('btn-default') || $(this).hasClass('btn-secondary') || txt === 'отмена' || txt === 'закрыть';
+                
+                if (isCancel) return false;
+                return txt.includes('начать') || txt.includes('копировать') || txt.includes('сохранить') || txt.includes('продолжить') || txt.includes('да') || isPrimary;
+              }).first();
+
+              if ($startBtn.length) {
+                console.log('[FastExclude] УСПЕШНОЕ НАЖАТИЕ НА КНОПКУ МОДАЛА:', $startBtn[0]);
+                $startBtn[0].click();
+                clearInterval(checkModalInterval);
+              } else {
+                isProcessingModal = false;
+              }
+            }, 250);
+            return;
+          }
+
+          if (attempts >= 18) {
+            clearInterval(checkModalInterval);
+            console.warn('[FastExclude] Модальное окно не появилось за 4.5 сек');
+          }
+        }, 250);
+      } else {
+        console.warn('[FastExclude] Пункт "Копировать" не найден');
+      }
+    };
+
+    switchTabAndExecute();
+    return { success: true };
+  } catch (err) {
+    console.error('[FastExclude] Ошибка в runCopyMailingAutomation:', err);
+    return { success: false, message: err.message };
   }
 }

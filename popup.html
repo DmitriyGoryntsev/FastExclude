@@ -3,55 +3,108 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FastExclude for Senler</title>
-  <!-- Google Fonts: Plus Jakarta Sans & DM Sans -->
+  <title>FastExclude for Senler & Salebot</title>
+  <!-- Google Fonts: Inter, Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
 
-  <!-- Top Nav Bar -->
+  <!-- Top App Header -->
   <header class="app-header">
-    <div class="nav-pill-container">
+    <div class="brand-bar">
       <div class="brand">
-        <span class="brand-logo-fire"></span>
+        <span class="status-led"></span>
         <span class="brand-name">FASTEXCLUDE</span>
-      </div>
-      <div class="header-actions">
-        <button id="btnExportImport" class="btn-ghost-pill" title="Экспорт / Импорт пресетов">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        <button id="btnSwitchPlatform" class="platform-chip-btn" title="Сменить сервис (VK Senler / TG Salebot)">
+          <span id="platformBadgeIcon">💙</span>
+          <span id="platformBadgeText">Senler</span>
+          <svg class="chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
       </div>
-    </div>
-  </header>
-
-  <!-- Mode Selector Tabs (⚡ Исключения | ✉️ Рассылка) -->
-  <nav class="mode-tabs-container">
-    <button id="tabExclusions" class="mode-tab active">
-      ⚡ ИСКЛЮЧЕНИЯ
-    </button>
-    <button id="tabMailings" class="mode-tab">
-      ✉️ СОЗДАНИЕ РАССЫЛКИ
-    </button>
-  </nav>
-
-  <!-- VIEW 1: EXCLUSIONS MODE -->
-  <div id="exclusionsView" class="view-section">
-    <!-- Search & Create Bar -->
-    <div class="search-section">
-      <div class="search-pill">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="text" id="searchInput" placeholder="Поиск пресета по названию..." autocomplete="off">
-        <button id="btnClearSearch" class="btn-clear hidden">&times;</button>
-      </div>
-      <button id="btnOpenCreate" class="btn-ember-pill btn-icon-only" title="Новый пресет">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      <button id="btnExportImport" class="btn-icon-ghost" title="Экспорт / Импорт пресетов">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
       </button>
     </div>
 
-    <!-- Presets List Container -->
+    <!-- Mode Selector Segmented Tabs -->
+    <nav class="mode-nav" id="modeNav">
+      <button id="tabExclusions" class="nav-btn active">⚡ ИСКЛЮЧЕНИЯ</button>
+      <button id="tabMailings" class="nav-btn">✉️ СОЗДАНИЕ</button>
+      <button id="tabClone" class="nav-btn">📋 КОПИРОВАНИЕ</button>
+    </nav>
+  </header>
+
+  <!-- VIEW 0: PLATFORM SELECTOR SCREEN -->
+  <div id="platformSelectorView" class="view-section hidden">
+    <div class="platform-selector-box">
+      <div class="selector-title-row">
+        <span class="selector-kicker">NEXT-GEN AUTOMATION</span>
+        <h2>ВЫБЕРИТЕ СЕРВИС</h2>
+        <p class="selector-subtitle">Укажите платформу для авто-исключений и управления рассылками</p>
+      </div>
+
+      <div class="platform-cards-stack">
+        <!-- Senler (VK) Option Card -->
+        <div id="cardSelectSenler" class="platform-card platform-senler active" role="button" tabindex="0">
+          <div class="card-brand-icon senler-brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.408 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.862-.525-2.049-1.713-1.033-1.01-1.492-1.139-1.744-1.139-.356 0-.462.103-.462.607v1.658c0 .426-.138.687-1.258.687-1.849 0-3.896-1.121-5.337-3.204-2.164-3.076-2.756-5.39-2.756-5.859 0-.258.103-.497.607-.497h1.744c.453 0 .622.207.795.687.87 2.522 2.327 4.73 2.923 4.73.224 0 .327-.103.327-.671V10.74c-.069-1.152-.672-1.25-.672-1.659 0-.2.172-.404.448-.404h2.741c.371 0 .5.198.5.647v3.525c0 .378.172.507.284.507.224 0 .413-.129.827-.543 1.275-1.422 2.181-3.629 2.181-3.629.12-.258.327-.497.776-.497h1.744c.525 0 .638.267.525.647-.215.983-2.276 3.905-2.276 3.905-.181.284-.25.413 0 .741.172.241.741.724 1.121 1.164.698.784 1.232 1.439 1.378 1.896.147.457-.086.687-.543.687z"/>
+            </svg>
+          </div>
+          <div class="card-content-body">
+            <div class="card-header-line">
+              <span class="card-service-title">Senler</span>
+              <span class="service-badge badge-vk">ВКонтакте</span>
+            </div>
+            <p class="card-service-desc">Исключения, массовое авто-заполнение и копирование рассылок VK</p>
+          </div>
+          <div class="card-radio-indicator">
+            <div class="radio-circle">
+              <svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Salebot (Telegram) Option Card -->
+        <div id="cardSelectSalebot" class="platform-card platform-salebot" role="button" tabindex="0">
+          <div class="card-brand-icon salebot-brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.56 8.16l-1.97 9.28c-.15.65-.53.81-1.08.5l-3.01-2.22-1.45 1.4c-.16.16-.3.3-.61.3l.21-3.06 5.57-5.03c.24-.22-.05-.34-.37-.13l-6.88 4.33-2.96-.93c-.64-.2-.65-.64.13-.95l11.57-4.46c.53-.19.99.13.85.92z"/>
+            </svg>
+          </div>
+          <div class="card-content-body">
+            <div class="card-header-line">
+              <span class="card-service-title">Salebot</span>
+              <span class="service-badge badge-tg">Telegram</span>
+            </div>
+            <p class="card-service-desc">Автоматизация цепочек, дублирование и рассылки в кабинете Salebot</p>
+          </div>
+          <div class="card-radio-indicator">
+            <div class="radio-circle">
+              <svg class="check-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW 1: EXCLUSIONS MODE -->
+  <div id="exclusionsView" class="view-section">
+    <div class="search-section">
+      <div class="search-pill">
+        <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="searchInput" placeholder="Поиск пресета..." autocomplete="off">
+        <button id="btnClearSearch" class="btn-clear hidden">&times;</button>
+      </div>
+      <button id="btnOpenCreate" class="btn-ember-pill btn-create-trigger" title="Создать пресет">
+        + Пресет
+      </button>
+    </div>
+
     <main class="main-content">
       <div id="presetsList" class="presets-container"></div>
     </main>
@@ -60,57 +113,101 @@
   <!-- VIEW 2: MAILINGS MODE -->
   <div id="mailingsView" class="view-section hidden">
     <main class="main-content">
-      <div class="mailing-card">
-        <h3 class="mailing-card-title">МАССОВОЕ СОЗДАНИЕ РАССЫЛКИ</h3>
-        <p class="mailing-desc">Автоматическое заполнение полей рассылки (Название, Текст, Дата отправки и Пресет исключений) в Senler.</p>
+      <div class="form-group">
+        <label for="mailTitle" class="form-label">НАЗВАНИЕ РАССЫЛКИ</label>
+        <input type="text" id="mailTitle" class="caldera-input" placeholder="Анонс нового курса 2026">
+      </div>
 
-        <div class="form-group">
-          <label for="mailTitle" class="form-label">НАЗВАНИЕ РАССЫЛКИ</label>
-          <input type="text" id="mailTitle" class="caldera-input" placeholder="Например: Анонс нового курса 2026">
-        </div>
-
-        <div class="form-group">
-          <div class="label-with-tools">
-            <label for="mailMessage" class="form-label">ТЕКСТ СООБЩЕНИЯ</label>
-            <div class="fmt-toolbar" id="fmtToolbar">
-              <button type="button" class="btn-fmt" data-fmt="bold" title="Жирный текст (**текст** или Ctrl+B)"><b>Ж</b></button>
-              <button type="button" class="btn-fmt" data-fmt="italic" title="Курсив (*текст* или Ctrl+I)"><i>К</i></button>
-              <button type="button" class="btn-fmt" data-fmt="underline" title="Подчеркнутый (<u>текст</u> или Ctrl+U)"><u>Ч</u></button>
-              <button type="button" class="btn-fmt" data-fmt="strike" title="Зачеркнутый (~текст~)"><s>S</s></button>
-              <button type="button" class="btn-fmt" data-fmt="link" title="Вставить ссылку ([текст](url))">🔗</button>
-            </div>
+      <div class="form-group">
+        <div class="label-with-tools">
+          <label for="mailMessage" class="form-label">ТЕКСТ СООБЩЕНИЯ</label>
+          <div class="fmt-toolbar" id="fmtToolbar">
+            <button type="button" class="btn-fmt" data-fmt="bold" title="Жирный (**текст**)"><b>Ж</b></button>
+            <button type="button" class="btn-fmt" data-fmt="italic" title="Курсив (*текст*)"><i>К</i></button>
+            <button type="button" class="btn-fmt" data-fmt="underline" title="Подчеркнутый (<u>текст</u>)"><u>Ч</u></button>
+            <button type="button" class="btn-fmt" data-fmt="strike" title="Зачеркнутый (~текст~)"><s>S</s></button>
+            <button type="button" class="btn-fmt" data-fmt="link" title="Ссылка ([текст](url))">🔗</button>
           </div>
-          <textarea id="mailMessage" class="caldera-textarea" placeholder="Привет! Напоминаем о старте занятий..."></textarea>
-          <div class="fmt-hint">Форматирование: **жирный**, *курсив*, <u>подчеркнутый</u>, ~зачеркнутый~, [ссылка](url)</div>
         </div>
+        <textarea id="mailMessage" class="caldera-textarea" placeholder="Привет! Напоминаем о старте занятий..."></textarea>
+      </div>
 
-        <div class="form-group">
-          <label for="mailDateTime" class="form-label">ДАТА И ВРЕМЯ ОТПРАВКИ</label>
+      <div class="form-group">
+        <label class="form-label">ФОТО К РАССЫЛКЕ</label>
+        <div id="imageUploadBox" class="image-upload-box">
+          <input type="file" id="mailImageInput" accept="image/*" class="hidden">
+          <div id="uploadPlaceholder" class="upload-placeholder">
+            <svg class="upload-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <span class="upload-title">Загрузить фото (PNG, JPG, WEBP)</span>
+          </div>
+          <div id="imagePreviewWrapper" class="image-preview-wrapper hidden">
+            <img id="imagePreviewThumb" class="image-preview-thumb" src="" alt="Превью">
+            <div class="image-preview-info">
+              <span id="imageFileName" class="image-file-name">photo.png</span>
+              <span id="imageFileSize" class="image-file-size">0 KB</span>
+            </div>
+            <button type="button" id="btnRemoveImage" class="btn-remove-image" title="Удалить фото">&times;</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label for="mailDateTime" class="form-label">ДАТА И ВРЕМЯ</label>
           <input type="datetime-local" id="mailDateTime" class="caldera-input">
         </div>
-
-        <div class="form-group">
-          <label for="mailPresetSelect" class="form-label">ПРЕСЕТ ИСКЛЮЧЕНИЙ</label>
+        <div class="form-group flex-1">
+          <label for="mailPresetSelect" class="form-label">ИСКЛЮЧЕНИЯ</label>
           <div class="select-wrapper">
             <select id="mailPresetSelect" class="caldera-select"></select>
           </div>
         </div>
+      </div>
 
-        <div class="form-group checkbox-group">
-          <label class="caldera-checkbox-label">
-            <input type="checkbox" id="chkCopyAttachments" checked>
-            <span class="checkbox-text">Копировать фото и вложения из первой вкладки</span>
-          </label>
-        </div>
+      <div id="mailingStatusNotice" class="status-notice status-notice-idle">
+        <span class="status-dot"></span>
+        <span id="mailingStatusText" class="status-text">Готово к заполнению рассылки</span>
+      </div>
 
-        <div class="mailing-actions">
-          <button id="btnApplyMailingCurrent" class="btn-secondary-pill">
-            Заполнить текущую вкладку
-          </button>
-          <button id="btnApplyMailingAll" class="btn-ember-pill">
-            🚀 Заполнить все вкладки Senler
+      <div class="action-btn-group">
+        <button id="btnApplyMailingCurrent" class="btn-secondary-pill">Текущая вкладка</button>
+        <button id="btnApplyMailingAll" class="btn-ember-pill">🚀 Во всех вкладках</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- VIEW 3: CLONE MAILINGS MODE -->
+  <div id="cloneView" class="view-section hidden">
+    <main class="main-content">
+      <div class="form-group">
+        <div class="clone-pills-header">
+          <label class="form-label">БЫСТРЫЙ ВЫБОР РАССЫЛКИ</label>
+          <button type="button" id="btnOpenAddClonePreset" class="btn-add-pill-trigger" title="Добавить пресет">
+            + Пресет
           </button>
         </div>
+        <div class="clone-preset-pills" id="clonePresetPills">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="cloneKeyword" class="form-label">КЛЮЧЕВОЕ СЛОВО ДЛЯ ПОИСКА</label>
+        <input type="text" id="cloneKeyword" class="caldera-input" value="родители" placeholder="Например: родители, СШ, Маркетинг...">
+      </div>
+
+      <div id="cloneStatusNotice" class="status-notice status-notice-idle">
+        <span class="status-dot"></span>
+        <span id="cloneStatusText" class="status-text">Готово к копированию рассылки</span>
+      </div>
+
+      <div class="action-btn-group">
+        <button id="btnApplyCloneCurrent" class="btn-secondary-pill">Текущая вкладка</button>
+        <button id="btnApplyCloneAll" class="btn-ember-pill">🚀 Во всех вкладках</button>
       </div>
     </main>
   </div>
@@ -123,13 +220,13 @@
         <button id="btnCloseApplyTarget" class="modal-close">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="modal-desc">Вы выбрали пресет: <strong id="targetPresetNameName" style="color: var(--color-ember);">""</strong>.</p>
+        <p class="modal-desc">Вы выбрали пресет: <strong id="targetPresetNameName" style="color: var(--color-signal-green);">""</strong>.</p>
         <p class="modal-desc">Укажите область применения пресета исключений:</p>
         
         <div class="apply-choice-actions">
           <button id="btnApplyCurrentTabOnly" class="btn-secondary-pill btn-choice">
             <span class="choice-title">Только к этой вкладке</span>
-            <span class="choice-sub">Применит исключения на активной открытой странице Senler</span>
+            <span class="choice-sub">Применит исключения на открытой странице Senler</span>
           </button>
 
           <button id="btnApplyAllTabs" class="btn-ember-pill btn-choice">
@@ -225,8 +322,30 @@
     </div>
   </div>
 
-  <!-- Toast Notification Container -->
-  <div id="toastContainer" class="toast-container"></div>
+  <!-- MODAL: Add Custom Clone Preset -->
+  <div id="addCloneModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>НОВЫЙ ПРЕСЕТ КОПИРОВАНИЯ</h2>
+        <button id="btnCloseAddClone" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="cloneLabelInput" class="form-label">НАЗВАНИЕ КНОПКИ (С ИКОНКОЙ)</label>
+          <input type="text" id="cloneLabelInput" class="caldera-input" placeholder="Например: 👨‍👩‍👧 Родители или 🚀 Маркетинг">
+        </div>
+        <div class="form-group">
+          <label for="cloneKeywordModalInput" class="form-label">КЛЮЧЕВОЕ СЛОВО ДЛЯ ПОИСКА</label>
+          <input type="text" id="cloneKeywordModalInput" class="caldera-input" placeholder="Например: родители">
+          <div class="fmt-hint">Слово, по которому рассылка будет отыскиваться в Senler</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnCancelAddClone" class="btn-secondary-pill">Отмена</button>
+        <button id="btnSaveAddClone" class="btn-ember-pill">Сохранить пресет</button>
+      </div>
+    </div>
+  </div>
 
   <script src="popup.js"></script>
 </body>
